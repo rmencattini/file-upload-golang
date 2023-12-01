@@ -1,32 +1,39 @@
 package main
 
 import (
+	"encoding/json"
 	"file-upload-golang/src/config"
-	minio_client "file-upload-golang/src/minio-client"
+	"file-upload-golang/src/crypto"
+	minioclient "file-upload-golang/src/minio-client"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
+var appConfig = config.Config{}
+var aesBlockById = crypto.AesBlockMap{}
+
 func main() {
-	//logger := log.Logger{}
+	file, err := os.Open("config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
 
-	// TODO fix the config
-	_ = config.Config{}
+	err = json.NewDecoder(file).Decode(&appConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	minioClient := minio_client.GetMinioClient()
-	minio_client.CreateBucket(minioClient)
+	minioClient := minioclient.GetMinioClient(appConfig)
+	minioclient.CreateBucket(minioClient, appConfig)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Route("/file", func(r chi.Router) {
-
-		r.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-			writer.Write([]byte("list all articles id -name"))
-		})
 
 		r.Post("/", func(writer http.ResponseWriter, request *http.Request) {
 			// Get the file from the request
@@ -38,19 +45,18 @@ func main() {
 			defer file.Close()
 
 			// Respond to the client
-			minioClient := minio_client.GetMinioClient()
-			minio_client.UploadFile(minioClient, handler.Filename, file)
+			minioClient := minioclient.GetMinioClient(appConfig)
+			minioclient.UploadFile(minioClient, handler.Filename, file, appConfig, aesBlockById)
 			fmt.Fprintf(writer, "File %s uploaded successfully!\n", handler.Filename)
 		})
 
 		r.Get("/{fileId}", func(writer http.ResponseWriter, request *http.Request) {
-			minioClient := minio_client.GetMinioClient()
-			file := minio_client.GetFile(minioClient, chi.URLParam(request, "fileId"))
-			byteAnswer, err := io.ReadAll(file)
+			minioClient := minioclient.GetMinioClient(appConfig)
+			byteAnswer := minioclient.GetFile(minioClient, chi.URLParam(request, "fileId"), appConfig, aesBlockById)
+			_, err = writer.Write(byteAnswer)
 			if err != nil {
-				log.Fatal(err)
+				return
 			}
-			writer.Write(byteAnswer)
 		})
 
 	})
