@@ -1,15 +1,15 @@
 package file
 
 import (
-	"crypto/sha256"
 	"file-upload-golang/src/config"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"mime/multipart"
 )
 
 type IdContent struct {
-	FileId      [32]byte
+	FileId      string
 	FileContent []byte
 }
 
@@ -17,7 +17,7 @@ func GetFileIdContents(file multipart.File, appConfig config.Config) []IdContent
 	res := make([]IdContent, 0)
 	for _, fileShard := range splitFiles(file, appConfig) {
 		res = append(res, IdContent{
-			FileId:      getFileId(fileShard),
+			FileId:      getFileId(),
 			FileContent: fileShard,
 		})
 	}
@@ -28,18 +28,22 @@ func splitFiles(file multipart.File, appConfig config.Config) [][]byte {
 	chunk := make([]byte, appConfig.GetSliceSize())
 	res := make([][]byte, 0)
 	for {
-		_, err := file.Read(chunk)
+		n, err := file.Read(chunk)
 		if err != nil {
 			if err != io.EOF {
 				log.Fatal(err)
 			}
 			break
 		}
-		res = append(res, chunk)
+		res = append(res, append([]byte(nil), chunk[:n]...))
 	}
 	return res
 }
 
-func getFileId(fileContent []byte) [32]byte {
-	return sha256.Sum256(fileContent)
+func getFileId() string {
+	fileId, err := uuid.NewUUID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return fileId.String()
 }

@@ -1,12 +1,13 @@
 {
   "split": {
     "activate": true,
-    "slice-size": "2MB"
+    "slice-size": "100KB"
   },
   "minio": {
     "bucket-name": "custom-bucket",
     "host": "localhost:9000",
     "id": "minioadmin",
     "password": "minioadmin"
-  }
+  },
+  "aes-key": "not secured not secured!"
 }

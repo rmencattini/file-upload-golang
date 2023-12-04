@@ -16,6 +16,7 @@ type Config struct {
 		SecretAccessKey string `json:"password"`
 		BucketName      string `json:"bucket-name"`
 	} `json:"minio"`
+	AesKey string `json:"aes-key"`
 }
 
 func (config Config) GetSliceSize() bytesize.ByteSize {

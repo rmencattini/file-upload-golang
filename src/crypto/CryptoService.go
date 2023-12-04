@@ -11,21 +11,24 @@ import (
 
 type AesBlockMap map[string]cipher.Block
 
-func (aesBlockMap AesBlockMap) Encrypt(file multipart.File, key string) ([]byte, error) {
+func (aesBlockMap AesBlockMap) EncryptFile(file multipart.File, key string) ([]byte, error) {
 
 	byteAnswer, err := io.ReadAll(file)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ciphertext := make([]byte, aes.BlockSize+len(byteAnswer))
+	return aesBlockMap.EncryptData(byteAnswer, key)
+}
+func (aesBlockMap AesBlockMap) EncryptData(data []byte, key string) ([]byte, error) {
+	ciphertext := make([]byte, aes.BlockSize+len(data))
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, err
 	}
 
 	stream := cipher.NewCFBEncrypter(aesBlockMap[key], iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], byteAnswer)
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], data)
 
 	return ciphertext, nil
 }

@@ -6,6 +6,8 @@ import (
 	"crypto/aes"
 	"file-upload-golang/src/config"
 	"file-upload-golang/src/crypto"
+	fileservice "file-upload-golang/src/file"
+	"fmt"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
@@ -46,24 +48,22 @@ func CreateBucket(minioClient *minio.Client, appConfig config.Config) {
 func UploadFile(minioClient *minio.Client, objectName string, file multipart.File, appConfig config.Config, aesBlockById crypto.AesBlockMap) {
 	ctx := context.Background()
 
-	block, err := aes.NewCipher([]byte("not secured not secured!"))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	aesBlockById[objectName] = block
-
-	encryptedText, err := aesBlockById.Encrypt(file, objectName)
+	createAesBlock(appConfig, aesBlockById, objectName)
+	encryptedText, err := aesBlockById.EncryptFile(file, objectName)
 	if err != nil {
 		log.Fatal(err)
 	}
+	uploadEncryptedText(minioClient, objectName, ctx, encryptedText, appConfig)
+}
 
-	info, err := minioClient.PutObject(ctx, appConfig.Minio.BucketName, objectName, bytes.NewReader(encryptedText), -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
-
-	if err != nil {
-		log.Fatalln(err)
+func UploadFilePart(minioClient *minio.Client, objectName string, file multipart.File, appConfig config.Config, aesBlockById crypto.AesBlockMap, shardsByFile fileservice.ShardsByFile) {
+	fileByIds := fileservice.GetFileIdContents(file, appConfig)
+	shardsByFile[objectName] = []string{}
+	for i, fileById := range fileByIds {
+		fileShardId := fmt.Sprintf("%s-%d-%s", objectName, i, fileById.FileId)
+		uploadData(minioClient, fileShardId, fileById.FileContent, appConfig, aesBlockById)
+		shardsByFile[objectName] = append(shardsByFile[objectName], fileShardId)
 	}
-
-	log.Printf("Successfully uploaded %s of size %d with key: %s\n", objectName, info.Size, info.Key)
 }
 
 func GetFile(minioClient *minio.Client, key string, appConfig config.Config, aesBlockById crypto.AesBlockMap) []byte {
@@ -86,4 +86,39 @@ func GetFile(minioClient *minio.Client, key string, appConfig config.Config, aes
 	}
 
 	return decryptedByteAnswer
+}
+
+func GetFilePart(minioClient *minio.Client, key string, appConfig config.Config, aesBlockById crypto.AesBlockMap, shardsByFile fileservice.ShardsByFile) []byte {
+	var res []byte
+	for _, fileShardId := range shardsByFile[key] {
+		res = append(res, GetFile(minioClient, fileShardId, appConfig, aesBlockById)...)
+	}
+	return res
+}
+
+func uploadData(minioClient *minio.Client, objectName string, data []byte, appConfig config.Config, aesBlockById crypto.AesBlockMap) {
+	ctx := context.Background()
+
+	createAesBlock(appConfig, aesBlockById, objectName)
+	encryptedText, err := aesBlockById.EncryptData(data, objectName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	uploadEncryptedText(minioClient, objectName, ctx, encryptedText, appConfig)
+}
+
+func createAesBlock(appConfig config.Config, aesBlockById crypto.AesBlockMap, objectName string) {
+	block, err := aes.NewCipher([]byte(appConfig.AesKey))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	aesBlockById[objectName] = block
+}
+
+func uploadEncryptedText(minioClient *minio.Client, objectName string, ctx context.Context, encryptedText []byte, appConfig config.Config) {
+	_, err := minioClient.PutObject(ctx, appConfig.Minio.BucketName, objectName, bytes.NewReader(encryptedText), -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
