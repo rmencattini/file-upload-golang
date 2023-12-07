@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/json"
 	"file-upload-golang/src/domain/services"
 	"file-upload-golang/src/infrastructure/config"
 	redisclient "file-upload-golang/src/infrastructure/redis"
@@ -87,35 +86,14 @@ func UploadFilePart(minioClient *minio.Client, objectName string, file multipart
 	log.Println(statusCmd)
 }
 
-func GetFile(minioClient *minio.Client, key string, client *redis.Client) []byte {
-	redisString, err := client.Get(context.Background(), key).Result()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	var redisObject redisclient.Redis
-	err = json.Unmarshal([]byte(redisString), &redisObject)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func GetFile(minioClient *minio.Client, key string, redisObject redisclient.Redis) []byte {
 	decryptedByteAnswer := getFile(minioClient, key, redisObject.AesKey, redisObject.BucketName)
 
 	return decryptedByteAnswer
 }
 
-func GetFilePart(minioClient *minio.Client, key string, client *redis.Client) []byte {
+func GetFilePart(minioClient *minio.Client, redisObject redisclient.Redis) []byte {
 	var res []byte
-	redisString, err := client.Get(context.Background(), key).Result()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	var redisObject redisclient.Redis
-	err = json.Unmarshal([]byte(redisString), &redisObject)
-	if err != nil {
-		log.Fatal(err)
-	}
 	for _, fileShardId := range redisObject.Ids {
 		res = append(res, getFile(minioClient, fileShardId, redisObject.AesKey, redisObject.BucketName)...)
 	}

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"file-upload-golang/src/infrastructure/config"
 	minioservice "file-upload-golang/src/infrastructure/minio"
+	redisclient "file-upload-golang/src/infrastructure/redis"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -73,12 +75,24 @@ func main() {
 		})
 
 		r.Get("/{fileId}", func(writer http.ResponseWriter, request *http.Request) {
+			objectKey := chi.URLParam(request, "fileId")
 			minioClient := minioservice.GetMinioClient(appConfig)
 			var byteAnswer []byte
-			if appConfig.Split.Activate {
-				byteAnswer = minioservice.GetFilePart(minioClient, chi.URLParam(request, "fileId"), redisClient)
+			redisString, err := redisClient.Get(context.Background(), objectKey).Result()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			var redisObject redisclient.Redis
+			err = json.Unmarshal([]byte(redisString), &redisObject)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if redisObject.Split {
+				byteAnswer = minioservice.GetFilePart(minioClient, redisObject)
 			} else {
-				byteAnswer = minioservice.GetFile(minioClient, chi.URLParam(request, "fileId"), redisClient)
+				byteAnswer = minioservice.GetFile(minioClient, chi.URLParam(request, "fileId"), redisObject)
 			}
 			_, err = writer.Write(byteAnswer)
 			if err != nil {
