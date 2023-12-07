@@ -11,33 +11,33 @@ import (
 
 type AesBlockMap map[string]cipher.Block
 
-func (aesBlockMap AesBlockMap) EncryptFile(file multipart.File, key string) ([]byte, error) {
+func EncryptFile(file multipart.File, aesBlock cipher.Block) ([]byte, error) {
 
 	byteAnswer, err := io.ReadAll(file)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return aesBlockMap.EncryptData(byteAnswer, key)
+	return EncryptData(byteAnswer, aesBlock)
 }
-func (aesBlockMap AesBlockMap) EncryptData(data []byte, key string) ([]byte, error) {
+func EncryptData(data []byte, aesBlock cipher.Block) ([]byte, error) {
 	ciphertext := make([]byte, aes.BlockSize+len(data))
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, err
 	}
 
-	stream := cipher.NewCFBEncrypter(aesBlockMap[key], iv)
+	stream := cipher.NewCFBEncrypter(aesBlock, iv)
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], data)
 
 	return ciphertext, nil
 }
 
-func (aesBlockMap AesBlockMap) Decrypt(cipherText []byte, key string) ([]byte, error) {
+func Decrypt(cipherText []byte, aesBlock cipher.Block) ([]byte, error) {
 	iv := cipherText[:aes.BlockSize]
 	cipherText = cipherText[aes.BlockSize:]
 
-	stream := cipher.NewCFBDecrypter(aesBlockMap[key], iv)
+	stream := cipher.NewCFBDecrypter(aesBlock, iv)
 	stream.XORKeyStream(cipherText, cipherText)
 
 	return cipherText, nil

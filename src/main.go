@@ -3,12 +3,11 @@ package main
 import (
 	"encoding/json"
 	"file-upload-golang/src/config"
-	"file-upload-golang/src/crypto"
-	"file-upload-golang/src/file"
 	minioclient "file-upload-golang/src/minio-client"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -16,8 +15,10 @@ import (
 )
 
 var appConfig = config.Config{}
-var aesBlockById = crypto.AesBlockMap{}
-var fileShardsByFile = file.ShardsByFile{}
+var redisClient = redis.NewClient(&redis.Options{
+	Addr: "localhost:6379",
+	DB:   0, // use default DB
+})
 
 func main() {
 	logger := log.Logger{}
@@ -58,12 +59,12 @@ func main() {
 				}
 			}(uploadedFile)
 
-			// Respond to the client
+			// Respond to the redisClient
 			minioClient := minioclient.GetMinioClient(appConfig)
 			if appConfig.Split.Activate {
-				minioclient.UploadFilePart(minioClient, handler.Filename, uploadedFile, appConfig, aesBlockById, fileShardsByFile)
+				minioclient.UploadFilePart(minioClient, handler.Filename, uploadedFile, appConfig, redisClient)
 			} else {
-				minioclient.UploadFile(minioClient, handler.Filename, uploadedFile, appConfig, aesBlockById)
+				minioclient.UploadFile(minioClient, handler.Filename, uploadedFile, appConfig, redisClient)
 			}
 			_, err = fmt.Fprintf(writer, "File %s uploaded successfully!\n", handler.Filename)
 			if err != nil {
@@ -75,9 +76,9 @@ func main() {
 			minioClient := minioclient.GetMinioClient(appConfig)
 			var byteAnswer []byte
 			if appConfig.Split.Activate {
-				byteAnswer = minioclient.GetFilePart(minioClient, chi.URLParam(request, "fileId"), appConfig, aesBlockById, fileShardsByFile)
+				byteAnswer = minioclient.GetFilePart(minioClient, chi.URLParam(request, "fileId"), redisClient)
 			} else {
-				byteAnswer = minioclient.GetFile(minioClient, chi.URLParam(request, "fileId"), appConfig, aesBlockById)
+				byteAnswer = minioclient.GetFile(minioClient, chi.URLParam(request, "fileId"), redisClient)
 			}
 			_, err = writer.Write(byteAnswer)
 			if err != nil {

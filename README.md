@@ -18,7 +18,7 @@ man bash | col -b > bash.txt
  curl -F "file=@bash.txt" localhost:3000/file/
 ```
 4. You can check a few things from the minio admin console:
- 5. It has been upload in multiple shards with the proper size
+ 5. It has been uploaded in multiple shards with the proper size
  6. If you download some files, they are encrypted
 5. Retrieve the full decrypted file:
 ```bash 
@@ -55,5 +55,7 @@ Here is the configuration structure:
 * Cryptographic stuff is clunky
 * I did not test file upload with crazy extreme value
 * When upload file into multiple part, I need to generate multiple new name to upload them to Minio. I did not handle the name collision issue, so it can occur.
-* Data are not persisted. The next step would be to create a SQl instance to store the relation between file and file shards.
-  * Once this issue is solved, I will need to handle some case such as: upload (mode: split) and download (mode: not split) and vis versa.
+
+# Roadmap
+
+1. Keep the persistence updated (if we check an objectName, and it does not exist in Minio, delete it from the db)
