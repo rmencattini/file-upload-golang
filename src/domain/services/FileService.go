@@ -1,22 +1,18 @@
-package file
+package services
 
 import (
-	"file-upload-golang/src/config"
+	"file-upload-golang/src/domain/entities"
+	"file-upload-golang/src/infrastructure/config"
 	"github.com/google/uuid"
 	"io"
 	"log"
 	"mime/multipart"
 )
 
-type IdContent struct {
-	FileId      string
-	FileContent []byte
-}
-
-func GetFileIdContents(file multipart.File, appConfig config.Config) []IdContent {
-	res := make([]IdContent, 0)
+func GetFileIdContents(file multipart.File, appConfig config.Config) []entities.IdContent {
+	res := make([]entities.IdContent, 0)
 	for _, fileShard := range splitFiles(file, appConfig) {
-		res = append(res, IdContent{
+		res = append(res, entities.IdContent{
 			FileId:      getFileId(),
 			FileContent: fileShard,
 		})

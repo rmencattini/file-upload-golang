@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"file-upload-golang/src/config"
-	minioclient "file-upload-golang/src/minio-client"
+	"file-upload-golang/src/infrastructure/config"
+	minioservice "file-upload-golang/src/infrastructure/minio"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -38,8 +38,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	minioClient := minioclient.GetMinioClient(appConfig)
-	minioclient.CreateBucket(minioClient, appConfig)
+	minioClient := minioservice.GetMinioClient(appConfig)
+	minioservice.CreateBucket(minioClient, appConfig)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -60,11 +60,11 @@ func main() {
 			}(uploadedFile)
 
 			// Respond to the redisClient
-			minioClient := minioclient.GetMinioClient(appConfig)
+			minioClient := minioservice.GetMinioClient(appConfig)
 			if appConfig.Split.Activate {
-				minioclient.UploadFilePart(minioClient, handler.Filename, uploadedFile, appConfig, redisClient)
+				minioservice.UploadFilePart(minioClient, handler.Filename, uploadedFile, appConfig, redisClient)
 			} else {
-				minioclient.UploadFile(minioClient, handler.Filename, uploadedFile, appConfig, redisClient)
+				minioservice.UploadFile(minioClient, handler.Filename, uploadedFile, appConfig, redisClient)
 			}
 			_, err = fmt.Fprintf(writer, "File %s uploaded successfully!\n", handler.Filename)
 			if err != nil {
@@ -73,12 +73,12 @@ func main() {
 		})
 
 		r.Get("/{fileId}", func(writer http.ResponseWriter, request *http.Request) {
-			minioClient := minioclient.GetMinioClient(appConfig)
+			minioClient := minioservice.GetMinioClient(appConfig)
 			var byteAnswer []byte
 			if appConfig.Split.Activate {
-				byteAnswer = minioclient.GetFilePart(minioClient, chi.URLParam(request, "fileId"), redisClient)
+				byteAnswer = minioservice.GetFilePart(minioClient, chi.URLParam(request, "fileId"), redisClient)
 			} else {
-				byteAnswer = minioclient.GetFile(minioClient, chi.URLParam(request, "fileId"), redisClient)
+				byteAnswer = minioservice.GetFile(minioClient, chi.URLParam(request, "fileId"), redisClient)
 			}
 			_, err = writer.Write(byteAnswer)
 			if err != nil {

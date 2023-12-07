@@ -1,4 +1,4 @@
-package crypto
+package services
 
 import (
 	"crypto/aes"
@@ -8,8 +8,6 @@ import (
 	"log"
 	"mime/multipart"
 )
-
-type AesBlockMap map[string]cipher.Block
 
 func EncryptFile(file multipart.File, aesBlock cipher.Block) ([]byte, error) {
 

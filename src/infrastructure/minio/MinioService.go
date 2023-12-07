@@ -1,4 +1,4 @@
-package minio_client
+package minio
 
 import (
 	"bytes"
@@ -6,10 +6,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/json"
-	"file-upload-golang/src/config"
-	"file-upload-golang/src/crypto"
-	fileservice "file-upload-golang/src/file"
-	redisclient "file-upload-golang/src/redis-client"
+	"file-upload-golang/src/domain/services"
+	"file-upload-golang/src/infrastructure/config"
+	redisclient "file-upload-golang/src/infrastructure/redis"
 	"fmt"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -51,7 +50,7 @@ func UploadFile(minioClient *minio.Client, objectName string, file multipart.Fil
 	ctx := context.Background()
 
 	aesBlock := createAesBlock(appConfig.AesKey)
-	encryptedText, err := crypto.EncryptFile(file, aesBlock)
+	encryptedText, err := services.EncryptFile(file, aesBlock)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,7 +71,7 @@ func UploadFile(minioClient *minio.Client, objectName string, file multipart.Fil
 
 func UploadFilePart(minioClient *minio.Client, objectName string, file multipart.File, appConfig config.Config, client *redis.Client) {
 	ctx := context.Background()
-	fileByIds := fileservice.GetFileIdContents(file, appConfig)
+	fileByIds := services.GetFileIdContents(file, appConfig)
 	redisObject := redisclient.Redis{Split: true, Ids: make([]string, 0), AesKey: appConfig.AesKey, BucketName: appConfig.Minio.BucketName}
 
 	for i, fileById := range fileByIds {
@@ -138,7 +137,7 @@ func getFile(minioClient *minio.Client, key string, aesKey string, bucketName st
 	}
 
 	aesBlock := createAesBlock(aesKey)
-	decryptedByteAnswer, err := crypto.Decrypt(byteAnswer, aesBlock)
+	decryptedByteAnswer, err := services.Decrypt(byteAnswer, aesBlock)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -150,7 +149,7 @@ func uploadData(minioClient *minio.Client, objectName string, data []byte, appCo
 	ctx := context.Background()
 
 	aesBlock := createAesBlock(appConfig.AesKey)
-	encryptedText, err := crypto.EncryptData(data, aesBlock)
+	encryptedText, err := services.EncryptData(data, aesBlock)
 	if err != nil {
 		log.Fatal(err)
 	}
