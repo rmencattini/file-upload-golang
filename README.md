@@ -1,3 +1,16 @@
+# Requirement
+
+The solution can:
+1. Accept files of arbitrary size, encrypt their content, upload them to a Minio bucket.
+2. Serve the submitted files through a GET API (accessible with curl)
+3. Upload the file in a chuncks of configurable size (can be configured)
+4. Configure multiple options such as:
+   * upload chuncks feature enable/disable
+   * chunks size
+   * minio endpoint / user / password / bucketName
+   * aes key to encrypt / decrypt
+5. Persistence. When the service and stopped and relaunch, you can still get previous uploaded file.
+
 # Run
 
 Assuming minio is runing through the docker-compose:
@@ -54,7 +67,24 @@ Here is the configuration structure:
 }
 ```
 
-# Why Redis ?
+# Architecture / Design
+
+I tried to structure my code in a DDD way, so I split into:
+* domain
+  * entities
+  * services
+* infrastructure
+  * config
+  * minio
+  * redis
+
+I made effort to find the right balance between external libraries and the standard one.
+
+I keep the API as simple as possible, so I only have two endpoint:
+* `POST /file` with the file as body.
+* `GET /file/filename`
+
+## Why Redis ?
 
 It may be strange to choose Redis as persistence layer. I will explain this choice.
 
@@ -68,7 +98,7 @@ I was curious about a few lines from their [documentation](https://redis.io/docs
 > The general indication you should use both persistence methods is if you want a degree of data safety comparable to what PostgreSQL can provide you.
 
 So I decided to give a try for this small project as I did not have strong requirement. Anyway Redis can easily be swaped for any other key/value database (e.g MongoDB)
-# Possible improvement / self-criticism
+## Possible improvement / self-criticism
 
 * I do not have tests for some part of the code which require it (mostly `CryptoService.go`, `FileService.go` and `Config.go`)
 * Cryptographic stuff is clunky
